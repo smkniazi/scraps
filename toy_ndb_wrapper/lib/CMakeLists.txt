@@ -1,4 +1,4 @@
-project (hello_world)
+project (ndbapiwrapper)
 
 cmake_minimum_required (VERSION 3.5.0)
 
@@ -19,8 +19,8 @@ SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wformat-securit
 
 file(GLOB SOURCE ${PROJECT_SOURCE_DIR}/*.cpp)
 
-#add_executable(hello_world ${SOURCE})
-add_library(hello_world STATIC ${SOURCE})
+#add_executable(ndbapiwrapper ${SOURCE})
+add_library(ndbapiwrapper SHARED ${SOURCE})
 
 
-target_link_libraries(hello_world ndbclient pthread)
+target_link_libraries(ndbapiwrapper ndbclient pthread)

@@ -115,7 +115,7 @@ bool do_delete(long long key)
   return true;
 }
 
-bool do_read(long long key)
+long long do_read(long long key)
 {
   Ndb ndb_object(ndb_connection, "test_db");
   if (ndb_object.init() != 0)
@@ -127,8 +127,12 @@ bool do_read(long long key)
   const NdbDictionary::Table *table = dict->getTable("test_table");
 
   if (table == nullptr)
-    return on_error(dict->getNdbError(),
-                    "Failed to access 'test_db.test_table'");
+  {
+
+    on_error(dict->getNdbError(),
+             "Failed to access 'test_db.test_table'");
+    return -1;
+  }
 
   NdbTransaction *transaction = ndb_object.startTransaction(table);
   if (transaction == nullptr)
@@ -136,22 +140,29 @@ bool do_read(long long key)
 
   NdbOperation *operation = transaction->getNdbOperation(table);
   if (operation == nullptr)
-    return on_error(transaction->getNdbError(),
-                    "Failed to start read operation");
+  {
+    on_error(transaction->getNdbError(),
+             "Failed to start read operation");
+    return -1;
+  }
 
   operation->readTuple(NdbOperation::LM_CommittedRead);
   operation->equal("ATTR1", key);
   NdbRecAttr *myRecAttr = operation->getValue("ATTR2", NULL);
 
   if (transaction->execute(NdbTransaction::Commit) != 0)
-    return on_error(transaction->getNdbError(),
-                    "Failed to execute transaction");
+  {
+    on_error(transaction->getNdbError(),
+             "Failed to execute transaction");
+    return -1;
+  }
 
-  std::cout << myRecAttr->u_32_value() << std::endl;
+  long long retValue = myRecAttr->u_32_value();
+  // std::cout << retValue << std::endl;
 
   ndb_object.closeTransaction(transaction);
 
-  return true;
+  return retValue;
 }
 
 bool do_scan()
@@ -233,6 +244,7 @@ inline bool on_error(const struct NdbError &error,
 
 bool initialize(const char *connectstring)
 {
+  std::cout << "Initializing management server. Connect String: " << connectstring << std::endl;
   ndb_init();
   ndb_connection = new Ndb_cluster_connection(connectstring);
   if (ndb_connection->connect() != 0)
@@ -247,6 +259,7 @@ bool initialize(const char *connectstring)
     return false;
   }
 
+  std::cout << "Connected" << std::endl;
   return true;
 }
 
@@ -254,6 +267,7 @@ void shutdown()
 {
   ndb_end(0);
   delete ndb_connection;
+  std::cout << "NDB connection closed" << std::endl;
 }
 
 void some_action()
