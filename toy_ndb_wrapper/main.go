@@ -20,7 +20,7 @@ func main() {
 		log.Fatalf("Failed to connect")
 	}
 
-	iterations := 10000
+	iterations := 100000
 
 	for i := 0; i < iterations; i++ {
 		if !do_write(i, i) {
@@ -60,7 +60,7 @@ func do_read(key int) int64 {
 }
 
 func shutdown() {
-	C.shutdown()
+	// C.shutdown()
 }
 
 //func Hello() error {

@@ -6,6 +6,7 @@
 #include <NdbApi.hpp>
 
 Ndb_cluster_connection *ndb_connection;
+Ndb *ndb_object;
 
 inline bool on_error(const struct NdbError &error, const char *explanation);
 
@@ -41,13 +42,7 @@ int nomain(int argc, char **argv)
 
 bool do_write(long long key, long long value)
 {
-  Ndb ndb_object(ndb_connection, "test_db");
-  if (ndb_object.init() != 0)
-  {
-    on_error(ndb_object.getNdbError(), "Failed to initialize ndb object");
-  }
-
-  const NdbDictionary::Dictionary *dict = ndb_object.getDictionary();
+  const NdbDictionary::Dictionary *dict = ndb_object->getDictionary();
   const NdbDictionary::Table *table = dict->getTable("test_table");
 
   if (table == nullptr)
@@ -55,9 +50,9 @@ bool do_write(long long key, long long value)
                     "Failed to access 'test_db.test_table'");
 
   // The write will be performed within single transaction
-  NdbTransaction *transaction = ndb_object.startTransaction(table);
+  NdbTransaction *transaction = ndb_object->startTransaction(table);
   if (transaction == nullptr)
-    return on_error(ndb_object.getNdbError(), "Failed to start transaction");
+    return on_error(ndb_object->getNdbError(), "Failed to start transaction");
 
   NdbOperation *operation = transaction->getNdbOperation(table);
   if (operation == nullptr)
@@ -72,21 +67,14 @@ bool do_write(long long key, long long value)
     return on_error(transaction->getNdbError(),
                     "Failed to execute transaction");
 
-  ndb_object.closeTransaction(transaction);
+  ndb_object->closeTransaction(transaction);
 
   return true;
 }
 
 bool do_delete(long long key)
 {
-
-  Ndb ndb_object(ndb_connection, "test_db");
-  if (ndb_object.init() != 0)
-  {
-    on_error(ndb_object.getNdbError(), "Failed to initialize ndb object");
-  }
-
-  const NdbDictionary::Dictionary *dict = ndb_object.getDictionary();
+  const NdbDictionary::Dictionary *dict = ndb_object->getDictionary();
   const NdbDictionary::Table *table = dict->getTable("test_table");
 
   if (table == nullptr)
@@ -94,9 +82,9 @@ bool do_delete(long long key)
                     "Failed to access 'test_db.test_table'");
 
   // The delete operation will be performed within single transaction
-  NdbTransaction *transaction = ndb_object.startTransaction(table);
+  NdbTransaction *transaction = ndb_object->startTransaction(table);
   if (transaction == nullptr)
-    return on_error(ndb_object.getNdbError(), "Failed to start transaction");
+    return on_error(ndb_object->getNdbError(), "Failed to start transaction");
 
   NdbOperation *operation = transaction->getNdbOperation(table);
   if (operation == nullptr)
@@ -110,20 +98,14 @@ bool do_delete(long long key)
     return on_error(transaction->getNdbError(),
                     "Failed to execute transaction");
 
-  ndb_object.closeTransaction(transaction);
+  ndb_object->closeTransaction(transaction);
 
   return true;
 }
 
 long long do_read(long long key)
 {
-  Ndb ndb_object(ndb_connection, "test_db");
-  if (ndb_object.init() != 0)
-  {
-    on_error(ndb_object.getNdbError(), "Failed to initialize ndb object");
-  }
-
-  const NdbDictionary::Dictionary *dict = ndb_object.getDictionary();
+  const NdbDictionary::Dictionary *dict = ndb_object->getDictionary();
   const NdbDictionary::Table *table = dict->getTable("test_table");
 
   if (table == nullptr)
@@ -134,9 +116,9 @@ long long do_read(long long key)
     return -1;
   }
 
-  NdbTransaction *transaction = ndb_object.startTransaction(table);
+  NdbTransaction *transaction = ndb_object->startTransaction(table);
   if (transaction == nullptr)
-    return on_error(ndb_object.getNdbError(), "Failed to start transaction");
+    return on_error(ndb_object->getNdbError(), "Failed to start transaction");
 
   NdbOperation *operation = transaction->getNdbOperation(table);
   if (operation == nullptr)
@@ -160,21 +142,14 @@ long long do_read(long long key)
   long long retValue = myRecAttr->u_32_value();
   // std::cout << retValue << std::endl;
 
-  ndb_object.closeTransaction(transaction);
+  ndb_object->closeTransaction(transaction);
 
   return retValue;
 }
 
 bool do_scan()
 {
-
-  Ndb ndb_object(ndb_connection, "test_db");
-  if (ndb_object.init() != 0)
-  {
-    on_error(ndb_object.getNdbError(), "Failed to initialize ndb object");
-  }
-
-  NdbDictionary::Dictionary *dict = ndb_object.getDictionary();
+  NdbDictionary::Dictionary *dict = ndb_object->getDictionary();
   const NdbDictionary::Table *table = dict->getTable("test_table");
   if (table == nullptr)
     return on_error(dict->getNdbError(),
@@ -196,9 +171,9 @@ bool do_scan()
     return on_error(dict->getNdbError(), "Failed to create record");
 
   // All reads will be performed within single transaction
-  NdbTransaction *transaction = ndb_object.startTransaction(table);
+  NdbTransaction *transaction = ndb_object->startTransaction(table);
   if (transaction == nullptr)
-    return on_error(ndb_object.getNdbError(), "Failed to start transaction");
+    return on_error(ndb_object->getNdbError(), "Failed to start transaction");
 
   // Note the usage of NdbScanOperation instead of regular NdbOperation
   NdbScanOperation *operation = transaction->scanTable(record);
@@ -225,7 +200,7 @@ bool do_scan()
     return on_error(transaction->getNdbError(), "Failed to read tuple");
 
   operation->close();
-  ndb_object.closeTransaction(transaction);
+  ndb_object->closeTransaction(transaction);
   dict->releaseRecord(record);
 
   return true;
@@ -259,7 +234,13 @@ bool initialize(const char *connectstring)
     return false;
   }
 
-  std::cout << "Connected" << std::endl;
+  ndb_object = new Ndb(ndb_connection, "test_db");
+  if (ndb_object->init() != 0)
+  {
+    on_error(ndb_object->getNdbError(), "Failed to initialize ndb object");
+  }
+
+  std::cout << "Connected." << std::endl;
   return true;
 }
 

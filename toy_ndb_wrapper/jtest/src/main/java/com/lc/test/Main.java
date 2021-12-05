@@ -9,6 +9,7 @@ import java.util.Properties;
 
 public class Main {
   public SessionFactory sessionFactory;
+  Session session;
 
   public static void main(String argv[]) throws Exception {
     new Main().test();
@@ -16,10 +17,11 @@ public class Main {
 
   public void test() throws Exception {
     setUpDBConnection();
+    session = sessionFactory.getSession();
 
     long startTime = System.currentTimeMillis();
 
-    int iterations = 10000;
+    int iterations = 100000;
     for (int i = 0; i < iterations; i++) {
       writeRow(i, i);
     }
@@ -33,24 +35,20 @@ public class Main {
   }
 
   public void writeRow(int key, int value) {
-    Session session = sessionFactory.getSession();
     TestTable.TestTableDTO persistable = session.newInstance(TestTable.TestTableDTO.class);
     persistable.setAttr1(key);
     persistable.setAttr2(value);
     session.savePersistent(persistable);
     session.release(persistable);
-    session.close();
   }
 
   public void findRow(int key) {
-    Session session = sessionFactory.getSession();
     TestTable.TestTableDTO lTable = (TestTable.TestTableDTO) session.find(TestTable.TestTableDTO.class,
       key);
     if (lTable.getAttr2() < 0) {
       System.err.println("Wrong value read for index " + key);
     }
     session.release(lTable);
-    session.close();
   }
 
   public void setUpDBConnection() throws Exception {
