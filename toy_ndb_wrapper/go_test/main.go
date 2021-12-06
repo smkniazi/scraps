@@ -8,10 +8,10 @@ import (
 
 /*
 #cgo CFLAGS: -g -Wall
-#cgo LDFLAGS: -L./lib/build -lndbapiwrapper
+#cgo LDFLAGS: -L./../lib/build -lndbapiwrapper
 #cgo LDFLAGS: -L/usr/local/mysql/lib -lndbclient
 #include <stdlib.h>
-#include "lib/ndb_api_wrapper.h"
+#include "../lib/ndb_api_wrapper.h"
 #include "dummy.cc"
 */
 import "C"
