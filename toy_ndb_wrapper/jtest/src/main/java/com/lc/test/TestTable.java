@@ -19,8 +19,8 @@ public class TestTable {
     void setAttr1(int key);
 
     @Column(name = ATTR2)
-    int getAttr2();
-    void setAttr2(int val);
+    byte[] getAttr2();
+    void setAttr2(byte[] val);
 
   }
 }

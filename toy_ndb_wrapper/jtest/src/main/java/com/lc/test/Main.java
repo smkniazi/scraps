@@ -22,8 +22,9 @@ public class Main {
     long startTime = System.currentTimeMillis();
 
     int iterations = 100000;
+    byte[] data = new byte[4096];
     for (int i = 0; i < iterations; i++) {
-      writeRow(i, i);
+      writeRow(i, data);
     }
 
     for (int i = 0; i < iterations; i++) {
@@ -34,7 +35,7 @@ public class Main {
     System.out.println("Time taken: "+(endTime - startTime)+" ms");
   }
 
-  public void writeRow(int key, int value) {
+  public void writeRow(int key, byte[] value) {
     TestTable.TestTableDTO persistable = session.newInstance(TestTable.TestTableDTO.class);
     persistable.setAttr1(key);
     persistable.setAttr2(value);
@@ -45,7 +46,8 @@ public class Main {
   public void findRow(int key) {
     TestTable.TestTableDTO lTable = (TestTable.TestTableDTO) session.find(TestTable.TestTableDTO.class,
       key);
-    if (lTable.getAttr2() < 0) {
+
+    if (lTable.getAttr2().length < 4096) {
       System.err.println("Wrong value read for index " + key);
     }
     session.release(lTable);

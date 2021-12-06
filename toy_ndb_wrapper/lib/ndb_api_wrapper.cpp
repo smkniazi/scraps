@@ -4,15 +4,19 @@
 #include <string>
 #include <iterator>
 #include <NdbApi.hpp>
+#include <cstring>
 
 Ndb_cluster_connection *ndb_connection;
 Ndb *ndb_object;
+char attr2_data[2 + 4096] = {(char)4096 % 256, (char)4096 / 256, 0};
 
 inline bool on_error(const struct NdbError &error, const char *explanation);
+int get_byte_array(const NdbRecAttr *attr, char *first_byte, size_t &bytes);
 
 struct BasicRow
 {
-  int attr1, attr2;
+  int attr1;
+  char attr2[2 + 4096];
 };
 
 void hello_world()
@@ -20,27 +24,7 @@ void hello_world()
   std::cout << "Hello World!" << std::endl;
 }
 
-int nomain(int argc, char **argv)
-{
-  if (argc != 2)
-  {
-    std::cout << "Usage: "
-              << "prog <connectstring>" << std::endl;
-    return EXIT_FAILURE;
-  }
-
-  const char *connectstring = argv[1];
-  if (!initialize(connectstring))
-  {
-    return EXIT_FAILURE;
-  }
-
-  some_action();
-
-  return EXIT_SUCCESS;
-}
-
-bool do_write(long long key, long long value)
+bool do_write(long long key, char *value)
 {
   const NdbDictionary::Dictionary *dict = ndb_object->getDictionary();
   const NdbDictionary::Table *table = dict->getTable("test_table");
@@ -103,14 +87,13 @@ bool do_delete(long long key)
   return true;
 }
 
-long long do_read(long long key)
+long long do_read(long long key, char *first_byte)
 {
   const NdbDictionary::Dictionary *dict = ndb_object->getDictionary();
   const NdbDictionary::Table *table = dict->getTable("test_table");
 
   if (table == nullptr)
   {
-
     on_error(dict->getNdbError(),
              "Failed to access 'test_db.test_table'");
     return -1;
@@ -118,7 +101,10 @@ long long do_read(long long key)
 
   NdbTransaction *transaction = ndb_object->startTransaction(table);
   if (transaction == nullptr)
-    return on_error(ndb_object->getNdbError(), "Failed to start transaction");
+  {
+    on_error(ndb_object->getNdbError(), "Failed to start transaction");
+    return -1;
+  }
 
   NdbOperation *operation = transaction->getNdbOperation(table);
   if (operation == nullptr)
@@ -139,71 +125,56 @@ long long do_read(long long key)
     return -1;
   }
 
-  long long retValue = myRecAttr->u_32_value();
-  // std::cout << retValue << std::endl;
-
+  size_t count;
+  get_byte_array(myRecAttr, first_byte, count);
   ndb_object->closeTransaction(transaction);
 
-  return retValue;
+  return count;
 }
 
-bool do_scan()
+/* extracts the length and the start byte of the data stored */
+int get_byte_array(const NdbRecAttr *attr, char *first_byte, size_t &bytes)
 {
-  NdbDictionary::Dictionary *dict = ndb_object->getDictionary();
-  const NdbDictionary::Table *table = dict->getTable("test_table");
-  if (table == nullptr)
-    return on_error(dict->getNdbError(),
-                    "Cannot access table 'test_db.test_table'");
+  const NdbDictionary::Column::ArrayType array_type =
+      attr->getColumn()->getArrayType();
+  const size_t attr_bytes = attr->get_size_in_bytes();
+  const char *aRef = attr->aRef();
+  std::string result;
 
-  // Prepare record specification,
-  // this will allow us later to access rows in the table
-  // using our structure BasicRow
-  NdbRecord *record;
-  NdbDictionary::RecordSpecification record_spec[] = {
-      {table->getColumn("ATTR1"), offsetof(BasicRow, attr1), 0, 0, 0},
-      {table->getColumn("ATTR2"), offsetof(BasicRow, attr2), 0, 0, 0}};
-
-  record = dict->createRecord(table,
-                              record_spec,
-                              std::size(record_spec),
-                              sizeof(record_spec[0]));
-  if (record == nullptr)
-    return on_error(dict->getNdbError(), "Failed to create record");
-
-  // All reads will be performed within single transaction
-  NdbTransaction *transaction = ndb_object->startTransaction(table);
-  if (transaction == nullptr)
-    return on_error(ndb_object->getNdbError(), "Failed to start transaction");
-
-  // Note the usage of NdbScanOperation instead of regular NdbOperation
-  NdbScanOperation *operation = transaction->scanTable(record);
-  if (operation == nullptr)
-    return on_error(transaction->getNdbError(),
-                    "Failed to start scanTable operation");
-
-  // Note the usage of NoCommit flag, as we are only reading the tuples
-  if (transaction->execute(NdbTransaction::NoCommit) != 0)
-    return on_error(transaction->getNdbError(),
-                    "Failed to execute transaction");
-
-  const BasicRow *row_ptr;
-  int rc;
-  std::cout << "ATTR1"
-            << "\t"
-            << "ATTR2" << std::endl;
-  // Loop over all read results to print them
-  while ((rc = operation->nextResult(reinterpret_cast<const char **>(&row_ptr),
-                                     true, false)) == 0)
-    std::cout << row_ptr->attr1 << "\t" << row_ptr->attr2
-              << std::endl;
-  if (rc == -1)
-    return on_error(transaction->getNdbError(), "Failed to read tuple");
-
-  operation->close();
-  ndb_object->closeTransaction(transaction);
-  dict->releaseRecord(record);
-
-  return true;
+  switch (array_type)
+  {
+  case NdbDictionary::Column::ArrayTypeFixed:
+    /*
+     No prefix length is stored in aRef. Data starts from aRef's first byte
+     data might be padded with blank or null bytes to fill the whole column
+     */
+    // first_byte = aRef;
+    bytes = attr_bytes;
+    memcpy(first_byte, aRef, bytes);
+    return 0;
+  case NdbDictionary::Column::ArrayTypeShortVar:
+    /*
+     First byte of aRef has the length of data stored
+     Data starts from second byte of aRef
+     */
+    // first_byte = aRef + 1;
+    bytes = (size_t)(aRef[0]);
+    memcpy(first_byte, aRef+1, bytes);
+    return 0;
+  case NdbDictionary::Column::ArrayTypeMediumVar:
+    /*
+     First two bytes of aRef has the length of data stored
+     Data starts from third byte of aRef
+     */
+    // first_byte = aRef + 2;
+    bytes = (size_t)(aRef[1]) * 256 + (size_t)(aRef[0]);
+    memcpy(first_byte, aRef+2, bytes);
+    return 0;
+  default:
+    first_byte = NULL;
+    bytes = 0;
+    return -1;
+  }
 }
 
 inline bool on_error(const struct NdbError &error,
@@ -246,23 +217,7 @@ bool initialize(const char *connectstring)
 
 void shutdown()
 {
-  ndb_end(0);
+  // ndb_end(0);
   delete ndb_connection;
   std::cout << "NDB connection closed" << std::endl;
-}
-
-void some_action()
-{
-  int records = 100;
-  for (int i = 0; i < records; i++)
-  {
-    do_write(i, i * 2);
-  }
-
-  for (int i = 0; i < records; i++)
-  {
-    do_read(i);
-  }
-
-  // do_scan(&ndb_object);
 }
