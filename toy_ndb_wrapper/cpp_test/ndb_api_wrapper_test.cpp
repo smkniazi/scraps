@@ -31,7 +31,7 @@ int main(int argc, char **argv)
   }
   // sumArray(attr2_data, 2, 4098);
 
-  int iterations = 100000;
+  int iterations = 500000;
   for (int i = 0; i < iterations; i++)
   {
     do_write(i, attr2_data);

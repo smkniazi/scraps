@@ -21,7 +21,7 @@ func main() {
 		log.Fatalf("Failed to connect")
 	}
 
-	iterations := 100000
+	iterations := 500000
 
 	data := make([]byte, 4096+2)
 	data[0] = 4096 % 256

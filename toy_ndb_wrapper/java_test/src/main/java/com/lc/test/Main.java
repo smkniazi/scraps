@@ -21,7 +21,7 @@ public class Main {
 
     long startTime = System.currentTimeMillis();
 
-    int iterations = 100000;
+    int iterations = 500000;
     byte[] data = new byte[4096];
     for (int i = 0; i < iterations; i++) {
       writeRow(i, data);
